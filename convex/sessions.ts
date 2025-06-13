@@ -29,7 +29,7 @@ export const updateSession = mutation({
   args: {
     sessionId: v.id("sessions"),
     duration: v.number(),
-    isPaused: v.optional(v.boolean()),
+    isPaused: v.boolean(),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -42,7 +42,7 @@ export const updateSession = mutation({
 
     await ctx.db.patch(args.sessionId, {
       duration: args.duration,
-      ...(args.isPaused !== undefined && { isPaused: args.isPaused }),
+      isPaused: args.isPaused,
     });
   },
 });

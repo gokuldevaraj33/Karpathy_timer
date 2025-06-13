@@ -66,11 +66,11 @@ export function TimerApp() {
         return;
       }
       if (currentSession.isCompleted) {
-        setDisplayTime(currentSession.currentDuration || currentSession.duration || 0);
+        setDisplayTime(currentSession.currentDuration || currentSession.duration);
         return;
       }
-      if (currentSession.isPaused) {
-        setDisplayTime(currentSession.currentDuration);
+      if (currentSession.isPaused === true) {
+        setDisplayTime(currentSession.currentDuration || currentSession.duration);
         return;
       }
       // If running, calculate elapsed
@@ -78,7 +78,7 @@ export function TimerApp() {
       setDisplayTime(currentSession.duration + elapsed);
     }
     recalcTime();
-    if (currentSession && !currentSession.isPaused && !currentSession.isCompleted) {
+    if (currentSession && currentSession.isPaused === false && !currentSession.isCompleted) {
       interval = setInterval(recalcTime, 1000);
     }
     return () => {
@@ -134,16 +134,28 @@ export function TimerApp() {
 
   // Pause should update Convex and UI will reflect via polling
   const handlePause = () => {
-    if (sessionId && currentSession && !currentSession.isPaused && !currentSession.isCompleted) {
-      updateSession({ sessionId, duration: displayTime, isPaused: true });
+    if (sessionId && currentSession && !currentSession.isCompleted && currentSession.isPaused === false) {
+      // Calculate the actual duration up to this point
+      const actualDuration = Math.floor((Date.now() - currentSession.startTime) / 1000) + currentSession.duration;
+      updateSession({ 
+        sessionId, 
+        duration: actualDuration, 
+        isPaused: true 
+      });
       toast.info("Timer paused");
     }
   };
 
   // Resume should update Convex and UI will reflect via polling
   const handleResume = () => {
-    if (sessionId && currentSession && currentSession.isPaused && !currentSession.isCompleted) {
-      updateSession({ sessionId, duration: displayTime, isPaused: false });
+    if (sessionId && currentSession && !currentSession.isCompleted && currentSession.isPaused === true) {
+      // When resuming, we need to update both the duration and pause state
+      // The duration should be the stored duration from when we paused
+      updateSession({ 
+        sessionId, 
+        duration: currentSession.duration, 
+        isPaused: false 
+      });
       toast.success("Timer resumed");
     }
   };

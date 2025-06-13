@@ -88,3 +88,14 @@ export const updateUsername = mutation({
     }
   },
 });
+
+export const updateSession = mutation({
+  args: {
+    sessionId: v.id("sessions"),
+    duration: v.number(),
+    isPaused: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    // ...existing code...
+  },
+});

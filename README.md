@@ -39,17 +39,8 @@ Leaderboard: Compare progress with other users
 Contributing
 Contributions are welcome. Please read our contributing guidelines before submitting pull requests.
 
-License
-MIT License
-
 Acknowledgments
 - Inspired by the 10,000-hour rule
 - Built with Convex
 - Developed using React and TypeScript
 
-Contact
-GitHub: [Your GitHub Profile]
-LinkedIn: [Your LinkedIn Profile]
-Twitter: [Your Twitter Handle]
-
-Made with care by [Your Name]

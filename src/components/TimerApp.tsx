@@ -26,7 +26,7 @@ export function TimerApp() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [completedSessionTime, setCompletedSessionTime] = useState(0);
-  const [localNow, setLocalNow] = useState(Date.now());
+  const [displayTime, setDisplayTime] = useState(0);
 
   const currentSession = useQuery(api.sessions.getCurrentSession);
   const startSession = useMutation(api.sessions.startSession);
@@ -48,7 +48,6 @@ export function TimerApp() {
   useEffect(() => {
     if (currentSession) {
       setSessionId(currentSession._id);
-      // Only set activityName if session is not completed
       if (!currentSession.isCompleted) {
         setActivityName(currentSession.activityName || "");
       }
@@ -58,34 +57,34 @@ export function TimerApp() {
     }
   }, [currentSession]);
 
-  // Poll local time every second to update timer display and force re-render
+  // Robust timer sync: always recalculate from Convex session state
   useEffect(() => {
-    const interval = setInterval(() => {
-      setLocalNow(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Calculate current time from server session state
-  let currentTime = 0;
-  let isRunning = false;
-  let isPaused = false;
-  let isCompleted = false;
-  if (currentSession) {
-    isPaused = currentSession.isPaused;
-    isCompleted = currentSession.isCompleted;
-    if (isPaused) {
-      currentTime = currentSession.currentDuration;
-      isRunning = false;
-    } else if (!isCompleted) {
-      // Add elapsed time since startTime
-      currentTime = currentSession.duration + Math.floor((localNow - currentSession.startTime) / 1000);
-      isRunning = true;
-    } else {
-      currentTime = currentSession.currentDuration || currentSession.duration || 0;
-      isRunning = false;
+    let interval: NodeJS.Timeout | undefined;
+    function recalcTime() {
+      if (!currentSession) {
+        setDisplayTime(0);
+        return;
+      }
+      if (currentSession.isCompleted) {
+        setDisplayTime(currentSession.currentDuration || currentSession.duration || 0);
+        return;
+      }
+      if (currentSession.isPaused) {
+        setDisplayTime(currentSession.currentDuration);
+        return;
+      }
+      // If running, calculate elapsed
+      const elapsed = Math.floor((Date.now() - currentSession.startTime) / 1000);
+      setDisplayTime(currentSession.duration + elapsed);
     }
-  }
+    recalcTime();
+    if (currentSession && !currentSession.isPaused && !currentSession.isCompleted) {
+      interval = setInterval(recalcTime, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [currentSession]);
 
   // Check for daily goal achievement
   useEffect(() => {
@@ -135,25 +134,25 @@ export function TimerApp() {
 
   // Pause should update Convex and UI will reflect via polling
   const handlePause = () => {
-    if (sessionId && currentSession && !isPaused && !isCompleted) {
-      updateSession({ sessionId, duration: currentTime, isPaused: true });
+    if (sessionId && currentSession && !currentSession.isPaused && !currentSession.isCompleted) {
+      updateSession({ sessionId, duration: displayTime, isPaused: true });
       toast.info("Timer paused");
     }
   };
 
   // Resume should update Convex and UI will reflect via polling
   const handleResume = () => {
-    if (sessionId && currentSession && isPaused && !isCompleted) {
-      updateSession({ sessionId, duration: currentTime, isPaused: false });
+    if (sessionId && currentSession && currentSession.isPaused && !currentSession.isCompleted) {
+      updateSession({ sessionId, duration: displayTime, isPaused: false });
       toast.success("Timer resumed");
     }
   };
 
   // Stop should complete session in Convex and reset UI everywhere
   const handleStop = async () => {
-    const finalTime = currentTime;
+    const finalTime = displayTime;
     setCompletedSessionTime(finalTime);
-    if (sessionId && finalTime > 0 && !isCompleted) {
+    if (sessionId && finalTime > 0 && !currentSession?.isCompleted) {
       try {
         await completeSession({ sessionId, duration: finalTime });
         setShowSessionComplete(true);
@@ -167,10 +166,10 @@ export function TimerApp() {
 
   // When session is completed, always clear activityName for next start
   useEffect(() => {
-    if (isCompleted) {
+    if (currentSession?.isCompleted) {
       setActivityName("");
     }
-  }, [isCompleted]);
+  }, [currentSession?.isCompleted]);
 
   return (
     <div className="space-y-6">
@@ -279,8 +278,8 @@ export function TimerApp() {
           {/* Timer Section */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <CircularTimer
-              currentTime={currentTime}
-              isRunning={isRunning}
+              currentTime={displayTime}
+              isRunning={currentSession && !currentSession.isPaused && !currentSession.isCompleted}
               onStart={handleStart}
               onPause={handlePause}
               onResume={handleResume}

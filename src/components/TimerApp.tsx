@@ -133,10 +133,47 @@ export function TimerApp() {
   };
 
   // Pause should update Convex and UI will reflect via polling
-  const handlePause = () => {
-    if (sessionId && currentSession && !currentSession.isPaused && !currentSession.isCompleted) {
-      updateSession({ sessionId, duration: displayTime, isPaused: true });
+  const handlePause = async () => {
+    if (!sessionId || !currentSession) {
+      return;
+    }
+    
+    // Type guard to ensure currentSession is not paused or completed
+    if (currentSession.isPaused === true || currentSession.isCompleted === true) {
+      return;
+    }
+    
+    try {
+      // Optimistically update UI
+      const currentDisplayTime = displayTime;
+      setDisplayTime(currentDisplayTime);
+      
+      // Call the mutation with retry logic
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          await updateSession({ 
+            sessionId, 
+            duration: currentDisplayTime, 
+            isPaused: true 
+          });
+          break;
+        } catch (error) {
+          retries--;
+          if (retries === 0) throw error;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        }
+      }
+      
       toast.info("Timer paused");
+    } catch (error) {
+      console.error("Failed to pause timer:", error);
+      toast.error("Failed to pause timer. Please try again.");
+      
+      // Revert optimistic update if the mutation failed
+      if (currentSession) {
+        setDisplayTime(currentSession.currentDuration);
+      }
     }
   };
 

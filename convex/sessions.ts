@@ -40,13 +40,11 @@ export const updateSession = mutation({
       throw new Error("Session not found");
     }
 
-    // If isPaused is not provided, keep the existing value
-    const updateData: any = {
+    // Create update data with duration and isPaused if provided
+    const updateData = {
       duration: args.duration,
+      ...(args.isPaused !== undefined && { isPaused: args.isPaused })
     };
-    if (args.isPaused !== undefined) {
-      updateData.isPaused = args.isPaused;
-    }
 
     await ctx.db.patch(args.sessionId, updateData);
   },
@@ -402,19 +400,18 @@ export const migrateSessions = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    // Get all sessions for the user
+    // Get all sessions for the user that don't have isPaused set
     const sessions = await ctx.db
       .query("sessions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("isPaused"), undefined))
       .collect();
 
-    // Update each session that doesn't have isPaused
+    // Update each session to set isPaused to false
     for (const session of sessions) {
-      if (session.isPaused === undefined) {
-        await ctx.db.patch(session._id, {
-          isPaused: false, // Set default value for existing sessions
-        });
-      }
+      await ctx.db.patch(session._id, { isPaused: false });
     }
+
+    return sessions.length;
   },
 });

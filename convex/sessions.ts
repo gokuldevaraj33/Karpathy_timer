@@ -13,15 +13,18 @@ export const startSession = mutation({
     const now = Date.now();
     const today = new Date().toISOString().split('T')[0];
 
-    return await ctx.db.insert("sessions", {
+    // Ensure isPaused is explicitly set to false for new sessions
+    const sessionData = {
       userId,
       startTime: now,
       duration: 0,
       isCompleted: false,
-      isPaused: false,
+      isPaused: false, // Explicitly set to false
       date: today,
       activityName: args.activityName,
-    });
+    };
+
+    return await ctx.db.insert("sessions", sessionData);
   },
 });
 
@@ -400,18 +403,21 @@ export const migrateSessions = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    // Get all sessions for the user that don't have isPaused set
+    // Get all sessions for the user
     const sessions = await ctx.db
       .query("sessions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("isPaused"), undefined))
       .collect();
 
-    // Update each session to set isPaused to false
+    let updatedCount = 0;
+    // Update each session that doesn't have isPaused set
     for (const session of sessions) {
-      await ctx.db.patch(session._id, { isPaused: false });
+      if (!("isPaused" in session)) {
+        await ctx.db.patch(session._id, { isPaused: false });
+        updatedCount++;
+      }
     }
 
-    return sessions.length;
+    return updatedCount;
   },
 });

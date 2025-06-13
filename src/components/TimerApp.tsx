@@ -73,12 +73,12 @@ export function TimerApp() {
         setDisplayTime(currentSession.currentDuration || currentSession.duration);
         return;
       }
-      // If running, calculate elapsed
+      // If running (isPaused is false or undefined), calculate elapsed
       const elapsed = Math.floor((Date.now() - currentSession.startTime) / 1000);
       setDisplayTime(currentSession.duration + elapsed);
     }
     recalcTime();
-    if (currentSession && currentSession.isPaused === false && !currentSession.isCompleted) {
+    if (currentSession && currentSession.isPaused !== true && !currentSession.isCompleted) {
       interval = setInterval(recalcTime, 1000);
     }
     return () => {
@@ -93,6 +93,18 @@ export function TimerApp() {
       setTimeout(() => setShowConfetti(false), 5000);
     }
   }, [todayProgress?.goalAchieved, showConfetti]);
+
+  // Run migration on component mount
+  useEffect(() => {
+    const migrate = async () => {
+      try {
+        await useMutation(api.sessions.migrateSessions)();
+      } catch (error) {
+        console.error("Failed to migrate sessions:", error);
+      }
+    };
+    migrate();
+  }, []);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -134,7 +146,7 @@ export function TimerApp() {
 
   // Pause should update Convex and UI will reflect via polling
   const handlePause = () => {
-    if (sessionId && currentSession && !currentSession.isCompleted && currentSession.isPaused === false) {
+    if (sessionId && currentSession && !currentSession.isCompleted && currentSession.isPaused !== true) {
       // Calculate the actual duration up to this point
       const actualDuration = Math.floor((Date.now() - currentSession.startTime) / 1000) + currentSession.duration;
       updateSession({ 

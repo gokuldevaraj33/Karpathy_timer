@@ -29,7 +29,7 @@ export const updateSession = mutation({
   args: {
     sessionId: v.id("sessions"),
     duration: v.number(),
-    isPaused: v.boolean(),
+    isPaused: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -40,10 +40,15 @@ export const updateSession = mutation({
       throw new Error("Session not found");
     }
 
-    await ctx.db.patch(args.sessionId, {
+    // If isPaused is not provided, keep the existing value
+    const updateData: any = {
       duration: args.duration,
-      isPaused: args.isPaused,
-    });
+    };
+    if (args.isPaused !== undefined) {
+      updateData.isPaused = args.isPaused;
+    }
+
+    await ctx.db.patch(args.sessionId, updateData);
   },
 });
 
@@ -388,5 +393,28 @@ export const getUserActivities = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .collect();
+  },
+});
+
+export const migrateSessions = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get all sessions for the user
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    // Update each session that doesn't have isPaused
+    for (const session of sessions) {
+      if (session.isPaused === undefined) {
+        await ctx.db.patch(session._id, {
+          isPaused: false, // Set default value for existing sessions
+        });
+      }
+    }
   },
 });

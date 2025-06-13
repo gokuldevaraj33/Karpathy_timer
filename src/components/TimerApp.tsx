@@ -46,13 +46,19 @@ export function TimerApp() {
 
   // Set sessionId and activityName from current session
   useEffect(() => {
-    if (currentSession && !sessionId) {
+    if (currentSession) {
       setSessionId(currentSession._id);
-      setActivityName(currentSession.activityName || "");
+      // Only set activityName if session is not completed
+      if (!currentSession.isCompleted) {
+        setActivityName(currentSession.activityName || "");
+      }
+    } else {
+      setSessionId(null);
+      setActivityName("");
     }
-  }, [currentSession, sessionId]);
+  }, [currentSession]);
 
-  // Poll local time every second to update timer display
+  // Poll local time every second to update timer display and force re-render
   useEffect(() => {
     const interval = setInterval(() => {
       setLocalNow(Date.now());
@@ -63,14 +69,21 @@ export function TimerApp() {
   // Calculate current time from server session state
   let currentTime = 0;
   let isRunning = false;
+  let isPaused = false;
+  let isCompleted = false;
   if (currentSession) {
-    if (currentSession.isPaused) {
+    isPaused = currentSession.isPaused;
+    isCompleted = currentSession.isCompleted;
+    if (isPaused) {
       currentTime = currentSession.currentDuration;
       isRunning = false;
-    } else {
+    } else if (!isCompleted) {
       // Add elapsed time since startTime
       currentTime = currentSession.duration + Math.floor((localNow - currentSession.startTime) / 1000);
       isRunning = true;
+    } else {
+      currentTime = currentSession.currentDuration || currentSession.duration || 0;
+      isRunning = false;
     }
   }
 
@@ -100,6 +113,7 @@ export function TimerApp() {
     return parts.join(' ');
   };
 
+  // Always require a new project name before starting
   const handleStart = () => {
     if (!activityName.trim()) {
       setShowActivityInput(true);
@@ -119,24 +133,27 @@ export function TimerApp() {
     }
   };
 
+  // Pause should update Convex and UI will reflect via polling
   const handlePause = () => {
-    if (sessionId && currentSession) {
+    if (sessionId && currentSession && !isPaused && !isCompleted) {
       updateSession({ sessionId, duration: currentTime, isPaused: true });
+      toast.info("Timer paused");
     }
-    toast.info("Timer paused");
   };
 
+  // Resume should update Convex and UI will reflect via polling
   const handleResume = () => {
-    if (sessionId && currentSession) {
+    if (sessionId && currentSession && isPaused && !isCompleted) {
       updateSession({ sessionId, duration: currentTime, isPaused: false });
+      toast.success("Timer resumed");
     }
-    toast.success("Timer resumed");
   };
 
+  // Stop should complete session in Convex and reset UI everywhere
   const handleStop = async () => {
     const finalTime = currentTime;
     setCompletedSessionTime(finalTime);
-    if (sessionId && finalTime > 0) {
+    if (sessionId && finalTime > 0 && !isCompleted) {
       try {
         await completeSession({ sessionId, duration: finalTime });
         setShowSessionComplete(true);
@@ -145,8 +162,15 @@ export function TimerApp() {
       }
     }
     setSessionId(null);
-    setActivityName("");
+    setActivityName(""); // Clear project name so next start always prompts
   };
+
+  // When session is completed, always clear activityName for next start
+  useEffect(() => {
+    if (isCompleted) {
+      setActivityName("");
+    }
+  }, [isCompleted]);
 
   return (
     <div className="space-y-6">

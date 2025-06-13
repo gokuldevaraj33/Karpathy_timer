@@ -161,12 +161,13 @@ export function TimerApp() {
   // Resume should update Convex and UI will reflect via polling
   const handleResume = () => {
     if (sessionId && currentSession && !currentSession.isCompleted && currentSession.isPaused === true) {
-      // When resuming, we need to update both the duration and pause state
-      // The duration should be the stored duration from when we paused
+      const now = Date.now();
+      // When resuming, update both duration and startTime to ensure accurate timing
       updateSession({ 
         sessionId, 
-        duration: currentSession.duration, 
-        isPaused: false 
+        duration: currentSession.duration,
+        startTime: now, // Reset the start time to now
+        isPaused: false // This is now a required boolean when provided
       });
       toast.success("Timer resumed");
     }

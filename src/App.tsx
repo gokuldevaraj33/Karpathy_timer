@@ -9,7 +9,7 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm h-16 flex justify-between items-center border-b shadow-sm px-4">
-        <h2 className="text-xl font-semibold text-blue-600">10,000 Hour Timer</h2>
+        <h2 className="text-xl font-semibold text-blue-600">Karpathy Timer App</h2>
         <Authenticated>
           <SignOutButton />
         </Authenticated>
@@ -42,7 +42,7 @@ function Content() {
         <div className="flex flex-col items-center justify-center min-h-[400px] gap-8">
           <div className="text-center">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              10,000 Hour Timer
+              Karpathy Timer App
             </h1>
             <p className="text-xl text-gray-600 mb-8">
               Master your craft with dedicated practice tracking

@@ -32,7 +32,8 @@ export const updateSession = mutation({
   args: {
     sessionId: v.id("sessions"),
     duration: v.number(),
-    isPaused: v.optional(v.boolean()),
+    startTime: v.optional(v.number()),
+    isPaused: v.union(v.boolean(), v.null()), // Allow boolean or null, but not undefined
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -43,10 +44,11 @@ export const updateSession = mutation({
       throw new Error("Session not found");
     }
 
-    // Create update data with duration and isPaused if provided
+    // Create update data with duration, startTime if provided, and isPaused if provided
     const updateData = {
       duration: args.duration,
-      ...(args.isPaused !== undefined && { isPaused: args.isPaused })
+      ...(args.startTime !== undefined && { startTime: args.startTime }),
+      ...(args.isPaused !== null && { isPaused: args.isPaused })
     };
 
     await ctx.db.patch(args.sessionId, updateData);

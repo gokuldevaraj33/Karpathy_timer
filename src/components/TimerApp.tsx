@@ -15,8 +15,6 @@ import { Confetti } from "./Confetti";
 import { toast } from "sonner";
 
 export function TimerApp() {
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
   const [sessionId, setSessionId] = useState<Id<"sessions"> | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -28,6 +26,7 @@ export function TimerApp() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [completedSessionTime, setCompletedSessionTime] = useState(0);
+  const [localNow, setLocalNow] = useState(Date.now());
 
   const currentSession = useQuery(api.sessions.getCurrentSession);
   const startSession = useMutation(api.sessions.startSession);
@@ -45,47 +44,35 @@ export function TimerApp() {
     }
   }, [user, initializeUser]);
 
-  // Initialize from existing session
+  // Set sessionId and activityName from current session
   useEffect(() => {
     if (currentSession && !sessionId) {
       setSessionId(currentSession._id);
-      setCurrentTime(currentSession.currentDuration);
-      setIsRunning(!currentSession.isPaused);
       setActivityName(currentSession.activityName || "");
     }
   }, [currentSession, sessionId]);
 
-  // Timer effect
+  // Poll local time every second to update timer display
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isRunning && sessionId) {
-      interval = setInterval(() => {
-        setCurrentTime(prev => {
-          const newTime = prev + 1;
-          
-          // Update session every 10 seconds
-          if (newTime % 10 === 0) {
-            updateSession({ sessionId, duration: newTime, isPaused: false });
-          }
-          
-          // Break reminders
-          if (settings?.breakReminderMinutes && newTime > 0 && 
-              newTime % (settings.breakReminderMinutes * 60) === 0) {
-            if (settings.soundNotifications) {
-              const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTuR2O/Eeyw');
-              audio.play().catch(() => {});
-            }
-            toast.info(`Break reminder: You've been practicing for ${settings.breakReminderMinutes} minutes!`);
-          }
-          
-          return newTime;
-        });
-      }, 1000);
-    }
-
+    const interval = setInterval(() => {
+      setLocalNow(Date.now());
+    }, 1000);
     return () => clearInterval(interval);
-  }, [isRunning, sessionId, updateSession, settings]);
+  }, []);
+
+  // Calculate current time from server session state
+  let currentTime = 0;
+  let isRunning = false;
+  if (currentSession) {
+    if (currentSession.isPaused) {
+      currentTime = currentSession.currentDuration;
+      isRunning = false;
+    } else {
+      // Add elapsed time since startTime
+      currentTime = currentSession.duration + Math.floor((localNow - currentSession.startTime) / 1000);
+      isRunning = true;
+    }
+  }
 
   // Check for daily goal achievement
   useEffect(() => {
@@ -106,12 +93,10 @@ export function TimerApp() {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const remainingSeconds = seconds % 60;
-    
     const parts = [];
     if (hours > 0) parts.push(`${hours}h`);
     if (minutes > 0) parts.push(`${minutes}m`);
     if (remainingSeconds > 0 || parts.length === 0) parts.push(`${remainingSeconds}s`);
-    
     return parts.join(' ');
   };
 
@@ -127,8 +112,6 @@ export function TimerApp() {
     try {
       const newSessionId = await startSession({ activityName: activityName.trim() });
       setSessionId(newSessionId);
-      setIsRunning(true);
-      setCurrentTime(0);
       setShowActivityInput(false);
       toast.success("Timer started!");
     } catch (error) {
@@ -137,26 +120,22 @@ export function TimerApp() {
   };
 
   const handlePause = () => {
-    setIsRunning(false);
-    if (sessionId) {
+    if (sessionId && currentSession) {
       updateSession({ sessionId, duration: currentTime, isPaused: true });
     }
     toast.info("Timer paused");
   };
 
   const handleResume = () => {
-    setIsRunning(true);
-    if (sessionId) {
+    if (sessionId && currentSession) {
       updateSession({ sessionId, duration: currentTime, isPaused: false });
     }
     toast.success("Timer resumed");
   };
 
   const handleStop = async () => {
-    setIsRunning(false);
     const finalTime = currentTime;
     setCompletedSessionTime(finalTime);
-    
     if (sessionId && finalTime > 0) {
       try {
         await completeSession({ sessionId, duration: finalTime });
@@ -165,8 +144,6 @@ export function TimerApp() {
         toast.error("Failed to save session");
       }
     }
-    
-    setCurrentTime(0);
     setSessionId(null);
     setActivityName("");
   };

@@ -27,6 +27,7 @@ export function TimerApp() {
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [completedSessionTime, setCompletedSessionTime] = useState(0);
   const [displayTime, setDisplayTime] = useState(0);
+  const [completedActivityName, setCompletedActivityName] = useState("");
 
   const currentSession = useQuery(api.sessions.getCurrentSession);
   const startSession = useMutation(api.sessions.startSession);
@@ -146,7 +147,7 @@ export function TimerApp() {
 
   // Pause should update Convex and UI will reflect via polling
   const handlePause = () => {
-    if (sessionId && currentSession && !currentSession.isCompleted && currentSession.isPaused !== true) {
+    if (sessionId && currentSession && !currentSession.isCompleted && currentSession.isPaused === true) {
       // Calculate the actual duration up to this point
       const actualDuration = Math.floor((Date.now() - currentSession.startTime) / 1000) + currentSession.duration;
       updateSession({ 
@@ -179,6 +180,7 @@ export function TimerApp() {
     setCompletedSessionTime(finalTime);
     if (sessionId && finalTime > 0 && !currentSession?.isCompleted) {
       try {
+        setCompletedActivityName(activityName); // Capture before clearing
         // First pause the session
         await updateSession({ 
           sessionId, 
@@ -218,9 +220,6 @@ export function TimerApp() {
               <h1 className="text-3xl font-bold text-gray-900 mb-4">
                 Jesse, we need to cook
               </h1>
-              <p className="text-lg text-gray-600 mb-6">
-                Ready to start your 10,000 hour journey?
-              </p>
               {user?.name && (
                 <p className="text-sm text-gray-500 mb-4">
                   Welcome, <span className="font-semibold text-blue-600">{user.name}</span>!
@@ -314,7 +313,7 @@ export function TimerApp() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <CircularTimer
               currentTime={displayTime}
-              isRunning={currentSession && !currentSession.isPaused && !currentSession.isCompleted}
+              isRunning={!!(currentSession && currentSession.isPaused === false && !currentSession.isCompleted)}
               onStart={handleStart}
               onPause={handlePause}
               onResume={handleResume}
@@ -407,7 +406,7 @@ export function TimerApp() {
         isOpen={showSessionComplete}
         onClose={() => setShowSessionComplete(false)}
         sessionTime={formatTimeWithUnits(completedSessionTime)}
-        activityName={activityName}
+        activityName={completedActivityName}
       />
     </div>
   );

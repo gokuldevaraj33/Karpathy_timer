@@ -13,13 +13,12 @@ export const startSession = mutation({
     const now = Date.now();
     const today = new Date().toISOString().split('T')[0];
 
-    // Ensure isPaused is explicitly set to false for new sessions
     const sessionData = {
       userId,
       startTime: now,
       duration: 0,
       isCompleted: false,
-      isPaused: false, // Explicitly set to false
+      isPaused: false, // Always set to false for new sessions
       date: today,
       activityName: args.activityName,
     };
@@ -33,23 +32,27 @@ export const updateSession = mutation({
     sessionId: v.id("sessions"),
     duration: v.number(),
     startTime: v.optional(v.number()),
-    isPaused: v.union(v.boolean(), v.null()), // Allow boolean or null, but not undefined
+    isPaused: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
     const session = await ctx.db.get(args.sessionId);
-    if (!session || session.userId !== userId) {
-      throw new Error("Session not found");
+    if (!session) throw new Error("Session not found");
+    if (session.userId !== userId) throw new Error("Not authorized");
+
+    const updateData: any = {
+      duration: args.duration,
+    };
+
+    if (args.startTime !== undefined) {
+      updateData.startTime = args.startTime;
     }
 
-    // Create update data with duration, startTime if provided, and isPaused if provided
-    const updateData = {
-      duration: args.duration,
-      ...(args.startTime !== undefined && { startTime: args.startTime }),
-      ...(args.isPaused !== null && { isPaused: args.isPaused })
-    };
+    if (args.isPaused !== undefined) {
+      updateData.isPaused = args.isPaused;
+    }
 
     await ctx.db.patch(args.sessionId, updateData);
   },
@@ -74,6 +77,7 @@ export const completeSession = mutation({
       endTime: now,
       duration: args.duration,
       isCompleted: true,
+      isPaused: true,
     });
 
     // Update activity tracking
@@ -400,26 +404,28 @@ export const getUserActivities = query({
 });
 
 export const migrateSessions = mutation({
-  args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    // Get all sessions for the user
+    // Get all sessions for the user that don't have isPaused set
     const sessions = await ctx.db
       .query("sessions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.eq(q.field("isPaused"), undefined)
+        )
+      )
       .collect();
 
-    let updatedCount = 0;
     // Update each session that doesn't have isPaused set
     for (const session of sessions) {
-      if (!("isPaused" in session)) {
+      if (session && session._id) {
         await ctx.db.patch(session._id, { isPaused: false });
-        updatedCount++;
       }
     }
 
-    return updatedCount;
+    return sessions.length; // Return number of sessions updated
   },
 });

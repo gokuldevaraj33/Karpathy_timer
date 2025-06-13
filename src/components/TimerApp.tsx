@@ -179,7 +179,17 @@ export function TimerApp() {
     setCompletedSessionTime(finalTime);
     if (sessionId && finalTime > 0 && !currentSession?.isCompleted) {
       try {
-        await completeSession({ sessionId, duration: finalTime });
+        // First pause the session
+        await updateSession({ 
+          sessionId, 
+          duration: finalTime,
+          isPaused: true 
+        });
+        // Then complete it
+        await completeSession({ 
+          sessionId, 
+          duration: finalTime 
+        });
         setShowSessionComplete(true);
       } catch (error) {
         toast.error("Failed to save session");

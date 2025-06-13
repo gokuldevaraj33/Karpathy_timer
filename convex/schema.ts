@@ -9,7 +9,7 @@ const applicationTables = {
     endTime: v.optional(v.number()),
     duration: v.number(), // in seconds
     isCompleted: v.boolean(),
-    isPaused: v.optional(v.boolean()), // Optional boolean field with default false
+    isPaused: v.optional(v.boolean()), // Make isPaused optional to handle existing sessions
     date: v.string(), // YYYY-MM-DD format
     activityName: v.optional(v.string()), // what the user is working on
   })

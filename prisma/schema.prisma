@@ -1,0 +1,10 @@
+model Timer {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  startTime DateTime
+  endTime   DateTime
+  isPaused  Boolean? @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+} 

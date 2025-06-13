@@ -405,27 +405,16 @@ export const getUserActivities = query({
 
 export const migrateSessions = mutation({
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    // Get all sessions for the user that don't have isPaused set
     const sessions = await ctx.db
       .query("sessions")
-      .filter((q) => 
-        q.and(
-          q.eq(q.field("userId"), userId),
-          q.eq(q.field("isPaused"), undefined)
-        )
-      )
+      .filter((q) => q.eq(q.field("isPaused"), undefined))
       .collect();
-
-    // Update each session that doesn't have isPaused set
+    
+    let updated = 0;
     for (const session of sessions) {
-      if (session && session._id) {
-        await ctx.db.patch(session._id, { isPaused: false });
-      }
+      await ctx.db.patch(session._id, { isPaused: false });
+      updated += 1;
     }
-
-    return sessions.length; // Return number of sessions updated
+    return updated;
   },
 });

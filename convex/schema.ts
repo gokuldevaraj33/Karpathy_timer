@@ -5,13 +5,13 @@ import { authTables } from "@convex-dev/auth/server";
 const applicationTables = {
   sessions: defineTable({
     userId: v.id("users"),
-    startTime: v.number(),
-    endTime: v.optional(v.number()),
-    duration: v.number(), // in seconds
+    activityName: v.optional(v.string()),
+    startTime: v.float64(),
+    endTime: v.optional(v.float64()),
+    duration: v.float64(),
     isCompleted: v.boolean(),
-    isPaused: v.optional(v.boolean()), // Make isPaused optional to handle existing sessions
-    date: v.string(), // YYYY-MM-DD format
-    activityName: v.optional(v.string()), // what the user is working on
+    isPaused: v.optional(v.boolean()),
+    date: v.string(),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_date", ["userId", "date"])
